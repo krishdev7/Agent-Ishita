@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Ishita — Your Personal AI"
+version = "1.0.0"
+id = "artifacts/kiku"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26035
+
+[services.development]
+run = "pnpm --filter @workspace/kiku run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kiku", "run", "build" ]
+publicDir = "artifacts/kiku/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26035"
+BASE_PATH = "/"
