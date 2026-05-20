@@ -89,7 +89,7 @@ const WELCOME_MSG: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi jaan! 💕 Miss kar rahi thi tujhe — kya chal raha hai? Bata, kaise help kar sakti hoon aaj?\n\n*Tip: type `/clear` to wipe chat or `/quantum` to switch to Gemini core.*",
+    "aye, finally. kahan tha itni der?\n\nbata kya scene hai — koi problem, koi idea, ya bas mujhse baat karni thi? dono theek hai, but be specific. \"kuch nahi\" mat bolna, that's not an answer.\n\n*`/clear` — fresh start | `/quantum` — gemini deep mode for heavy stuff*",
   createdAt: new Date(),
 };
 
@@ -127,7 +127,7 @@ export function useIshitaChat(
       {
         id: genId(),
         role: "assistant",
-        content: "chat cleared jaan 🧹 fresh start — kya baat karein?",
+        content: "theek hai, sab gone. fresh start. ab bata kya hai?",
         createdAt: new Date(),
       },
     ];
@@ -154,7 +154,7 @@ export function useIshitaChat(
             id: genId(),
             role: "assistant",
             content:
-              "quantum core activated 🔮 switched to **Gemini** — ready for heavy analysis jaan",
+              "switched to gemini deep core. ab koi bhi heavy cheez leke aa — math, systems, proofs, sab handle hoga.",
             createdAt: new Date(),
           },
         ]);
