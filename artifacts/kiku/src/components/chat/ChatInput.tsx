@@ -1,7 +1,8 @@
 import { useRef, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Send, Mic, MicOff, CircleStop as StopCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, Mic, MicOff, CircleStop as StopCircle, ImagePlus, X } from 'lucide-react';
 import { useVoiceInput } from '@/hooks/use-voice-input';
+import { compressImage } from '@/lib/imageUtils';
 
 interface ChatInputProps {
   input: string;
@@ -9,10 +10,21 @@ interface ChatInputProps {
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (e?: React.FormEvent) => void;
   onStop: () => void;
+  pendingImage: string | null;
+  onImageSelect: (dataUrl: string | null) => void;
 }
 
-export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: ChatInputProps) {
+export function ChatInput({
+  input,
+  isLoading,
+  onChange,
+  onSubmit,
+  onStop,
+  pendingImage,
+  onImageSelect,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const resizeTextarea = useCallback(() => {
     const el = textareaRef.current;
@@ -23,7 +35,6 @@ export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: Chat
 
   useEffect(() => { resizeTextarea(); }, [input, resizeTextarea]);
 
-  // Voice input — appends transcript to the current input
   const handleVoiceTranscript = useCallback(
     (text: string) => {
       const newValue = input.trim() ? `${input.trim()} ${text}` : text;
@@ -41,7 +52,28 @@ export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: Chat
     }
   };
 
-  const canSend = input.trim().length > 0 && !isLoading;
+  const handleImageFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        // Compress to max 1024px / 82% JPEG — enough for Gemini vision, gentle on data
+        const compressed = await compressImage(file, 1024, 0.82);
+        onImageSelect(compressed);
+      } catch {
+        // Fallback: read raw
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          if (ev.target?.result) onImageSelect(ev.target.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+      e.target.value = '';
+    },
+    [onImageSelect]
+  );
+
+  const canSend = (input.trim().length > 0 || !!pendingImage) && !isLoading;
 
   return (
     <motion.div
@@ -60,6 +92,46 @@ export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: Chat
         </span>
       </div>
 
+      {/* Pending image preview */}
+      <AnimatePresence>
+        {pendingImage && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="flex justify-end mb-2 px-1"
+          >
+            <div className="relative">
+              <img
+                src={pendingImage}
+                alt="pending upload"
+                className="rounded-xl object-cover"
+                style={{
+                  height: 72,
+                  width: 72,
+                  border: '1px solid var(--neon-teal-dim)',
+                  boxShadow: '0 0 12px var(--neon-teal-glow)',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => onImageSelect(null)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'rgba(15,15,25,0.95)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.7)',
+                }}
+                aria-label="Remove image"
+              >
+                <X size={9} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <form onSubmit={onSubmit} className="flex items-end gap-2">
         <div className="flex-1 glass-input rounded-2xl overflow-hidden flex items-end px-3.5 py-2.5 gap-2.5">
           <textarea
@@ -67,7 +139,7 @@ export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: Chat
             value={input}
             onChange={onChange}
             onKeyDown={handleKeyDown}
-            placeholder="Message Ishita..."
+            placeholder="Message Ketika..."
             rows={1}
             className="flex-1 bg-transparent resize-none outline-none text-[14.5px] leading-relaxed placeholder:opacity-30"
             style={{
@@ -79,6 +151,24 @@ export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: Chat
             }}
             disabled={isLoading}
           />
+
+          {/* Image picker button */}
+          {!isLoading && (
+            <motion.button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              whileTap={{ scale: 0.88 }}
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 mb-0.5"
+              style={{
+                color: pendingImage ? 'var(--neon-teal)' : 'rgba(255,255,255,0.25)',
+                background: pendingImage ? 'var(--neon-teal-dim)' : 'transparent',
+                boxShadow: pendingImage ? '0 0 8px var(--neon-teal-glow)' : 'none',
+              }}
+              aria-label="Attach image"
+            >
+              <ImagePlus size={14} />
+            </motion.button>
+          )}
 
           {/* Mic button — only when input is empty and not loading */}
           {!input.trim() && !isLoading && isSupported && (
@@ -107,6 +197,15 @@ export function ChatInput({ input, isLoading, onChange, onSubmit, onStop }: Chat
             </motion.button>
           )}
         </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageFile}
+        />
 
         <motion.button
           type={isLoading ? 'button' : 'submit'}

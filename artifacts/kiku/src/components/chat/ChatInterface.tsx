@@ -13,13 +13,21 @@ export function ChatInterface() {
   const { config, setConfig } = useUserConfig();
   const { facts, addOrUpdateFact } = useMemory();
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
-    useIshitaChat(
-      config.engine,
-      facts,
-      addOrUpdateFact,
-      () => setConfig({ engine: 'gemini' })
-    );
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    stop,
+    pendingImage,
+    setPendingImage,
+  } = useIshitaChat(
+    config.engine,
+    facts,
+    addOrUpdateFact,
+    () => setConfig({ engine: 'gemini' })
+  );
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -62,7 +70,7 @@ export function ChatInterface() {
         </>
       )}
 
-      {/* Ambient glow (shown when no custom bg, or subtly on top of bg) */}
+      {/* Ambient glow */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
         aria-hidden="true"
@@ -108,6 +116,8 @@ export function ChatInterface() {
         onChange={handleInputChange}
         onSubmit={handleSubmit}
         onStop={stop}
+        pendingImage={pendingImage}
+        onImageSelect={setPendingImage}
       />
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />

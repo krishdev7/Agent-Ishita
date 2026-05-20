@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { AIEngine } from "@/contexts/UserConfigContext";
 import type { UserFact } from "@/contexts/MemoryContext";
+import { cacheSelfieUrl } from "@/lib/imageCache";
 
 export type MessageRole = "user" | "assistant";
 
@@ -15,12 +16,13 @@ export interface Message {
   id: string;
   role: MessageRole;
   content: string;
+  imageUrl?: string;
   createdAt: Date;
   thinkingSteps?: ThinkingStep[];
 }
 
 // ─── History persistence ───────────────────────────────────────────────────
-const HISTORY_KEY = "ishita_chat_history_v1";
+const HISTORY_KEY = "ketika_chat_history_v1";
 type StoredMessage = Omit<Message, "createdAt"> & { createdAt: string };
 
 function loadHistory(): Message[] {
@@ -29,7 +31,7 @@ function loadHistory(): Message[] {
     if (!raw) return [];
     const stored = JSON.parse(raw) as StoredMessage[];
     return stored
-      .filter((m) => m.content.length > 0)
+      .filter((m) => m.content.length > 0 || m.imageUrl)
       .map((m) => ({ ...m, createdAt: new Date(m.createdAt) }));
   } catch {
     return [];
@@ -38,10 +40,12 @@ function loadHistory(): Message[] {
 
 function saveHistory(messages: Message[]) {
   try {
-    localStorage.setItem(
-      HISTORY_KEY,
-      JSON.stringify(messages.filter((m) => m.content.length > 0))
-    );
+    // Don't persist large base64 image data in history
+    const sanitized = messages.map((m) => ({
+      ...m,
+      imageUrl: m.imageUrl?.startsWith("data:") ? undefined : m.imageUrl,
+    }));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(sanitized));
   } catch {}
 }
 
@@ -84,12 +88,13 @@ function extractMarkers(text: string): MarkerResult {
 }
 
 const FACTS_RE = /<\|facts\|>([\s\S]*?)<\|\/facts\|>/;
+const SELFIE_RE = /!\[selfie\]\((https?:\/\/[^)]+)\)/g;
 
 const WELCOME_MSG: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "aye, finally. kahan tha itni der?\n\nbata kya scene hai — koi problem, koi idea, ya bas mujhse baat karni thi? dono theek hai, but be specific. \"kuch nahi\" mat bolna, that's not an answer.\n\n*`/clear` — fresh start | `/quantum` — gemini deep mode for heavy stuff*",
+    "aye, finally. kahan tha itni der?\n\nbata kya scene hai — koi problem, koi idea, ya bas mujhse baat karni thi? dono theek hai, but be specific. \"kuch nahi\" mat bolna.\n\n*`/clear` — fresh start | `/quantum` — gemini deep mode for heavy stuff*",
   createdAt: new Date(),
 };
 
@@ -111,16 +116,14 @@ export function useIshitaChat(
   });
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const historyRef = useRef(messages);
+  historyRef.current = messages;
 
-  useEffect(() => {
-    saveHistory(messages);
-  }, [messages]);
-
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value),
-    []
-  );
+  const persistHistory = useCallback((msgs: Message[]) => {
+    saveHistory(msgs);
+  }, []);
 
   const clearHistory = useCallback(() => {
     const cleared: Message[] = [
@@ -132,15 +135,23 @@ export function useIshitaChat(
       },
     ];
     setMessages(cleared);
-  }, []);
+    persistHistory(cleared);
+  }, [persistHistory]);
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value),
+    []
+  );
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       e?.preventDefault();
       const trimmed = input.trim();
-      if (!trimmed || isLoading) return;
+      const imageToSend = pendingImage;
 
-      // ── Slash commands ──────────────────────────────────────────────────
+      if ((!trimmed && !imageToSend) || isLoading) return;
+
+      // ── Slash commands (text only) ───────────────────────────────────────
       if (trimmed === "/clear") {
         clearHistory();
         setInput("");
@@ -148,45 +159,61 @@ export function useIshitaChat(
       }
       if (trimmed === "/quantum") {
         onSwitchToGemini?.();
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: genId(),
-            role: "assistant",
-            content:
-              "switched to gemini deep core. ab koi bhi heavy cheez leke aa — math, systems, proofs, sab handle hoga.",
-            createdAt: new Date(),
-          },
-        ]);
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            {
+              id: genId(),
+              role: "assistant" as MessageRole,
+              content: "switched to gemini deep core. ab koi bhi heavy cheez leke aa — math, systems, proofs, sab handle hoga.",
+              createdAt: new Date(),
+            },
+          ];
+          persistHistory(next);
+          return next;
+        });
         setInput("");
         return;
       }
 
-      // ── Normal send ─────────────────────────────────────────────────────
+      // ── Normal send ──────────────────────────────────────────────────────
       const userMsg: Message = {
         id: genId(),
         role: "user",
         content: trimmed,
+        imageUrl: imageToSend ?? undefined,
         createdAt: new Date(),
       };
       const assistantId = genId();
 
-      setMessages((prev) => [
-        ...prev,
-        userMsg,
-        { id: assistantId, role: "assistant", content: "", createdAt: new Date() },
-      ]);
+      setPendingImage(null);
       setInput("");
       setIsLoading(true);
+
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          userMsg,
+          { id: assistantId, role: "assistant" as MessageRole, content: "", createdAt: new Date() },
+        ];
+        persistHistory(next);
+        return next;
+      });
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
       try {
-        const apiMessages = [...messages, userMsg].map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        // Build API messages — support multimodal when imageUrl is present
+        const apiMessages = [...historyRef.current, userMsg].map((m) => {
+          if (m.imageUrl) {
+            const parts: Array<{ type: "image"; image: string } | { type: "text"; text: string }> =
+              [{ type: "image", image: m.imageUrl }];
+            if (m.content) parts.push({ type: "text", text: m.content });
+            return { role: m.role as "user" | "assistant", content: parts };
+          }
+          return { role: m.role as "user" | "assistant", content: m.content };
+        });
 
         const userMemory: Record<string, string> = {};
         facts.forEach((f) => { userMemory[f.key] = f.value; });
@@ -203,16 +230,16 @@ export function useIshitaChat(
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let markerBuffer = "";
+        let accumulatedContent = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const { display, thinkEvents, leftover } = extractMarkers(
-            markerBuffer + chunk
-          );
+          const { display, thinkEvents, leftover } = extractMarkers(markerBuffer + chunk);
           markerBuffer = leftover;
+          accumulatedContent += display;
 
           if (thinkEvents.length > 0) {
             setMessages((prev) =>
@@ -226,23 +253,27 @@ export function useIshitaChat(
           if (display) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, content: m.content + display }
-                  : m
+                m.id === assistantId ? { ...m, content: m.content + display } : m
               )
             );
           }
         }
 
-        // Flush any leftover buffer
+        // Flush leftover buffer
         if (markerBuffer) {
+          accumulatedContent += markerBuffer;
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: m.content + markerBuffer }
-                : m
+              m.id === assistantId ? { ...m, content: m.content + markerBuffer } : m
             )
           );
+        }
+
+        // Cache any selfie URLs discovered in the stream
+        let selfieMatch: RegExpExecArray | null;
+        const selfieRe = new RegExp(SELFIE_RE.source, "g");
+        while ((selfieMatch = selfieRe.exec(accumulatedContent)) !== null) {
+          cacheSelfieUrl(selfieMatch[1]);
         }
 
         // Post-process: strip facts block, fire onFactLearned
@@ -252,27 +283,21 @@ export function useIshitaChat(
             const match = FACTS_RE.exec(m.content);
             if (!match) return m;
             try {
-              const learned = JSON.parse(match[1]) as Array<{
-                key: string;
-                value: string;
-              }>;
+              const learned = JSON.parse(match[1]) as Array<{ key: string; value: string }>;
               learned.forEach((f) => onFactLearned?.(f.key, f.value));
             } catch {}
-            return {
-              ...m,
-              content: m.content.replace(FACTS_RE, "").trimEnd(),
-            };
+            return { ...m, content: m.content.replace(FACTS_RE, "").trimEnd() };
           })
         );
+
+        // Persist final state
+        setMessages((prev) => { persistHistory(prev); return prev; });
       } catch (err: unknown) {
         if (err instanceof Error && err.name !== "AbortError") {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
-                ? {
-                    ...m,
-                    content: "Ugh jaan, kuch toh gadbad ho gayi 😅 Try again?",
-                  }
+                ? { ...m, content: "ugh jaan, kuch toh gadbad ho gayi — try again?" }
                 : m
             )
           );
@@ -282,7 +307,7 @@ export function useIshitaChat(
         abortControllerRef.current = null;
       }
     },
-    [input, isLoading, messages, engine, facts, onFactLearned, onSwitchToGemini, clearHistory]
+    [input, pendingImage, isLoading, engine, facts, onFactLearned, onSwitchToGemini, clearHistory, persistHistory]
   );
 
   const stop = useCallback(() => {
@@ -308,5 +333,7 @@ export function useIshitaChat(
     reload,
     setInput,
     clearHistory,
+    pendingImage,
+    setPendingImage,
   };
 }

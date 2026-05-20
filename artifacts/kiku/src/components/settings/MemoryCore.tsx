@@ -52,7 +52,7 @@ export function MemoryCore() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'ishita_profile.json';
+    a.download = 'ketika_profile.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -81,7 +81,7 @@ export function MemoryCore() {
         setImportSuccess(true);
         setTimeout(() => setImportSuccess(false), 3000);
       } catch {
-        setImportError('Invalid profile file — make sure it\'s an ishita_profile.json');
+        setImportError('Invalid profile file — make sure it\'s a ketika_profile.json');
       }
     };
     reader.readAsText(file);
@@ -97,7 +97,7 @@ export function MemoryCore() {
           className="text-[10px] font-semibold uppercase tracking-widest"
           style={{ color: 'var(--text-muted)' }}
         >
-          Ishita Memory Core
+          Ketika Memory Core
         </p>
         <span
           className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
@@ -202,11 +202,7 @@ export function MemoryCore() {
                         value={editState.key}
                         onChange={(e) => setEditState({ ...editState, key: e.target.value })}
                         className="w-24 text-[11px] px-2 py-1 rounded-md outline-none flex-shrink-0"
-                        style={{
-                          background: 'var(--bg-elevated)',
-                          border: '1px solid var(--neon-teal-dim)',
-                          color: 'var(--neon-teal)',
-                        }}
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--neon-teal-dim)', color: 'var(--neon-teal)' }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveEdit();
                           if (e.key === 'Escape') setEditState(null);
@@ -216,11 +212,7 @@ export function MemoryCore() {
                         value={editState.value}
                         onChange={(e) => setEditState({ ...editState, value: e.target.value })}
                         className="flex-1 text-[11px] px-2 py-1 rounded-md outline-none"
-                        style={{
-                          background: 'var(--bg-elevated)',
-                          border: '1px solid var(--glass-border)',
-                          color: 'var(--text-primary)',
-                        }}
+                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSaveEdit();
                           if (e.key === 'Escape') setEditState(null);
@@ -240,10 +232,7 @@ export function MemoryCore() {
                       onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                     >
-                      <span
-                        className="text-[10px] font-semibold flex-shrink-0 w-24 truncate"
-                        style={{ color: 'var(--neon-teal)' }}
-                      >
+                      <span className="text-[10px] font-semibold flex-shrink-0 w-24 truncate" style={{ color: 'var(--neon-teal)' }}>
                         {fact.key}
                       </span>
                       <span className="text-[11px] flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>
@@ -281,11 +270,7 @@ export function MemoryCore() {
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
                   className="w-24 text-[11px] px-2 py-1 rounded-md outline-none flex-shrink-0"
-                  style={{
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--neon-teal-dim)',
-                    color: 'var(--neon-teal)',
-                  }}
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--neon-teal-dim)', color: 'var(--neon-teal)' }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleAddFact();
                     if (e.key === 'Escape') setShowAddRow(false);
@@ -296,11 +281,7 @@ export function MemoryCore() {
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   className="flex-1 text-[11px] px-2 py-1 rounded-md outline-none"
-                  style={{
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--glass-border)',
-                    color: 'var(--text-primary)',
-                  }}
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleAddFact();
                     if (e.key === 'Escape') setShowAddRow(false);
@@ -321,11 +302,7 @@ export function MemoryCore() {
         <button
           onClick={() => setShowAddRow(true)}
           className="w-full flex items-center gap-2 px-3 py-2.5 transition-all"
-          style={{
-            background: 'var(--bg-elevated)',
-            borderTop: '1px solid var(--glass-border)',
-            color: 'var(--text-muted)',
-          }}
+          style={{ background: 'var(--bg-elevated)', borderTop: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
             e.currentTarget.style.color = 'var(--neon-teal)';
@@ -345,11 +322,7 @@ export function MemoryCore() {
         <button
           onClick={handleExport}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold transition-all duration-200"
-          style={{
-            background: 'var(--neon-teal-dim)',
-            border: '1px solid var(--neon-teal-dim)',
-            color: 'var(--neon-teal)',
-          }}
+          style={{ background: 'var(--neon-teal-dim)', border: '1px solid var(--neon-teal-dim)', color: 'var(--neon-teal)' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--neon-teal-dim)'; }}
         >
@@ -359,11 +332,7 @@ export function MemoryCore() {
 
         <label
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-semibold cursor-pointer transition-all duration-200"
-          style={{
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--glass-border)',
-            color: 'var(--text-secondary)',
-          }}
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
             e.currentTarget.style.color = 'var(--text-primary)';

@@ -21,11 +21,11 @@ interface UserConfigContextValue {
   profileKey: string;
 }
 
-const CONFIG_STORAGE_KEY = 'ishita_user_config_v2';
+const CONFIG_STORAGE_KEY = 'ketika_user_config_v1';
 
 const DEFAULT_CONFIG: UserConfig = {
-  displayName: 'Ishita',
-  avatarInitial: 'I',
+  displayName: 'Ketika',
+  avatarInitial: 'K',
   avatarColorFrom: 'rgba(0,212,170,0.25)',
   avatarColorTo: 'rgba(59,139,235,0.25)',
   bannerColor: '#070a10',

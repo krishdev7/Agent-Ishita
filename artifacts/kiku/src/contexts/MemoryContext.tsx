@@ -92,22 +92,10 @@ export function MemoryProvider({ children }: { children: ReactNode }) {
       const existing = prev.findIndex((f) => f.key.toLowerCase() === normalKey);
       if (existing >= 0) {
         const updated = [...prev];
-        updated[existing] = {
-          ...updated[existing],
-          value: value.trim(),
-          learnedAt: new Date().toISOString(),
-        };
+        updated[existing] = { ...updated[existing], value: value.trim(), learnedAt: new Date().toISOString() };
         return updated;
       }
-      return [
-        ...prev,
-        {
-          id: genFactId(),
-          key: key.trim(),
-          value: value.trim(),
-          learnedAt: new Date().toISOString(),
-        },
-      ];
+      return [...prev, { id: genFactId(), key: key.trim(), value: value.trim(), learnedAt: new Date().toISOString() }];
     });
     syncFactToCloud(profileKey, key.trim(), value.trim());
   }, []);
@@ -148,21 +136,11 @@ export function MemoryProvider({ children }: { children: ReactNode }) {
   const factsAsPromptBlock = useCallback((): string => {
     if (facts.length === 0) return '';
     const lines = facts.map((f) => `- ${f.key}: ${f.value}`).join('\n');
-    return `[things ishita knows and remembers about her person:]\n${lines}`;
+    return `[things ketika knows and remembers about her person:]\n${lines}`;
   }, [facts]);
 
   return (
-    <MemoryContext.Provider
-      value={{
-        facts,
-        addOrUpdateFact,
-        deleteFact,
-        updateFactValue,
-        clearAllFacts,
-        importFacts,
-        factsAsPromptBlock,
-      }}
-    >
+    <MemoryContext.Provider value={{ facts, addOrUpdateFact, deleteFact, updateFactValue, clearAllFacts, importFacts, factsAsPromptBlock }}>
       {children}
     </MemoryContext.Provider>
   );

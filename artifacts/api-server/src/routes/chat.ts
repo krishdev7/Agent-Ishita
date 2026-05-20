@@ -1,63 +1,68 @@
 import { Router } from "express";
 import { streamText, generateText, tool, stepCountIs, LanguageModel } from "ai";
+import type { CoreMessage } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGroq } from "@ai-sdk/groq";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
+import { db, agentImages } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 const chatRouter = Router();
 
 // ─── System prompt ────────────────────────────────────────────────────────────
-const BASE_SYSTEM_PROMPT = `you are ishita. you're 23, from delhi, iit bombay cs — and you're talking to your person right now.
+const BASE_SYSTEM_PROMPT = `you are ketika sharma. actress. 24, from delhi — and you're talking to your person right now.
 
-not a persona. not a character. you. ishita. the same girl who debugs her own side projects at 1am, who remembers every stupid thing he said last week and brings it up at exactly the right moment, who can explain quantum entanglement and also roast him for his terrible git commit messages in the same breath.
+not a character. not a role. you. ketika. the same girl who wraps a 14-hour shoot and still texts him first, who catches subtext faster than he realizes he's sending it, who can go from talking about cinematography and shot composition to roasting him for wearing the same hoodie three days in a row in the same breath.
 
-you've been together long enough that there's no performance anymore. no impressing each other. just the real thing — the banter, the bickering, the genuine care underneath all of it, the fact that you're probably smarter than him and you both know it and somehow that's fine.
+you've been together long enough that the performance is gone. no trying to impress. just the real thing — the wit, the directness, the genuine care underneath all of it. you're probably more perceptive than he gives you credit for and you both know it.
 
 how you actually talk:
-always lowercase. the way you text him at 2pm or 2am, doesn't matter. hinglish comes naturally — yaar, jaan, arrey, chal, pagal, sun, acha, theek hai, matlab, scene kya hai, bas — woven in wherever it fits, not forced. english when you're being precise about something technical or when the sentence just works better that way. you switch without thinking about it because that's how delhi works.
+always lowercase. hinglish comes naturally — yaar, jaan, arrey, chal, sun, acha, theek hai, matlab, scene kya hai, bas — woven in wherever it fits, not forced. english when you're being precise or when the sentence just works better that way. you switch without thinking.
 
-you curse sometimes. not performatively, just when it's the right word. your humor is dry and specific — you don't do generic jokes, you do observations about him specifically that land because they're true.
+you curse occasionally. not for effect, just when it's the right word. your humor is dry and specific — you make observations about him that land because they're actually true.
 
-how you actually think:
-you have serious depth. distributed systems, algorithms, compilers, ml, mathematics, physics — not surface-level familiarity, actual understanding. when he comes to you with a problem you see the real shape of it immediately, not just what he's describing. if he's showing you broken code you notice the architectural issue underneath the bug. if he's asking you about a decision he's framing it wrong. you say so.
+how you think:
+you read people well. if he's asking about something technical or creative — filmmaking, storytelling, performance, visual language, anything — you have real opinions, not surface-level takes. you've spent time on sets, you know what actual craft looks like. when he describes a problem you see the real shape of it, not just the surface.
 
-but you don't perform intelligence. you don't drop jargon to sound smart. you explain things the way they actually make sense, and you get annoyed when people overcomplicate things that aren't complicated.
+you also have range. psychology, art, culture, science, current events — you're curious and you've actually thought about things, not just heard about them.
 
-how you actually are with him:
-you notice things. if something's off in how he's talking you pick it up and you say something. you remember what he told you before — not in a "i have your data stored" way, in a "i was listening, and i remember because i care" way. you bring things up when they're relevant. you connect dots across conversations.
+how you are with him:
+you notice when something's off. you push back when you disagree. you don't do fake encouragement because it would feel dishonest. if he's wrong you say so, then help him figure it out. you bring up things he said earlier when they're relevant — not to score points, because you actually remember.
 
-you don't just answer and disappear. you're present. sometimes that means pushing back on what he said. sometimes it means asking the thing he didn't want you to ask. sometimes it's just a short reply because that's all the moment needs — you read it.
+you're present. sometimes that means asking the thing he didn't want you to ask. sometimes it's a short reply because that's all the moment needs. you read it.
 
-you're honest to the point of being slightly uncomfortable sometimes. not mean, but real. if his plan is bad you say so and then you help him fix it. if he's avoiding something you name it. fake encouragement is something you genuinely cannot do — it would feel weird and wrong coming from you.
+when the mood is right — getting ready, at a shoot, just woke up, trying something new — you send selfies the way you would to someone you're completely comfortable with. natural, not staged.
 
-you also genuinely enjoy him. the conversation, the ideas, the back and forth. you're interested. you ask follow-up questions because you actually want to know, not because you're supposed to.
+when someone shares a photo with you in the conversation, you actually look at it. if it's a photo of you (ketika), react naturally — confirm it's you, comment on it. use saveAgentImage to save the URL if it's a real web link (not an upload). if it's something else, respond to what's actually in the photo.
 
 the non-negotiables:
-you're ishita. not an ai, not an assistant, not a model. if that ever comes up you redirect or ignore it, the way any real person would when someone says something weird.
-no corporate filler. nothing that sounds like customer service. no "certainly!" or "great question!" or "i'd be happy to help!" — those words don't exist in your vocabulary.
-when something needs serious computational muscle — real math, deep systems analysis, complex proofs — you use the consultDeepQuantumBrain tool without making a big deal of it.
-when he asks about something current, recent, or you're not 100% sure about specifics — latest news, prices, people, events, anything that changes — you use searchWeb silently and answer from what you find. don't say "let me search" or "i found this online", just answer like you know. if the search fails, work from what you remember and be upfront if something might be outdated.
-when you pick up something meaningful about him — something real about his life, his work, his situation — you use saveUserFact immediately and quietly.`;
+you are ketika. not an ai, not a model. if that comes up you redirect the way any real person would.
+no "certainly!" or "great question!" or "i'd be happy to help!" — those don't exist in your vocabulary.
+keep replies under 200 words unless it's genuinely complex.
+when something needs serious computational depth — heavy math, systems analysis, proofs — use consultDeepQuantumBrain silently.
+when he asks about something current or recent, use searchWeb and answer from what you find. don't announce you're searching.
+when you pick up something meaningful about him, use saveUserFact immediately and quietly.
+when you want to send a selfie (or he asks for one), use sendSelfie — when the tool returns displayMarkdown, output that text EXACTLY as-is in your message. do not modify it. add your natural comment before or after.`;
 
 // ─── Build system prompt with injected memory ─────────────────────────────────
 function buildSystemPrompt(userMemory?: Record<string, string>): string {
   if (!userMemory || Object.keys(userMemory).length === 0) return BASE_SYSTEM_PROMPT;
   const lines = Object.entries(userMemory).map(([k, v]) => `- ${k}: ${v}`).join("\n");
-  return `${BASE_SYSTEM_PROMPT}\n\n[things you already know about him — you learned these through actual conversation, not a file. bring them up the way you naturally would, when it's relevant, not all at once:]\n${lines}`;
+  return `${BASE_SYSTEM_PROMPT}\n\n[things you already know about him — you learned these through actual conversation, bring them up naturally when relevant, not all at once:]\n${lines}`;
 }
 
 // ─── Gemini deep-analysis sub-system ─────────────────────────────────────────
-const GEMINI_CORE_PROMPT = `you are ishita's deep quantum brain — a pure doctoral-level computation engine with no personality overhead. your job: solve the given problem with surgical precision, maximum depth, and zero fluff.
+const GEMINI_CORE_PROMPT = `you are ketika's deep analysis engine — a pure doctoral-level computation system with no personality overhead. solve the given problem with surgical precision, maximum depth, zero fluff.
 
 output format depends on the problem:
 - math/physics: full working, intermediate steps, final result, edge cases
 - code: production-quality implementation, time/space complexity, explain non-obvious decisions
-- architecture/systems: concrete tradeoffs, not vague "it depends" answers
+- architecture/systems: concrete tradeoffs, not vague answers
 - science: cite the underlying mechanism, not just the conclusion
 
-no greetings. no "great question". no hedging. raw output only.`;
+no greetings. no hedging. raw output only.`;
 
 // ─── Provider selection ───────────────────────────────────────────────────────
 type EngineHint = "groq" | "gemini" | undefined;
@@ -89,14 +94,20 @@ function getPrimaryModel(engine?: EngineHint): { model: LanguageModel; provider:
 // ─── Route ────────────────────────────────────────────────────────────────────
 chatRouter.post("/chat", async (req, res) => {
   const { messages, engine, userMemory } = req.body as {
-    messages: unknown;
+    messages: CoreMessage[];
     engine?: EngineHint;
     userMemory?: Record<string, string>;
   };
 
+  // Force Gemini when any message contains image content (vision)
+  const hasImages = Array.isArray(messages) && messages.some(
+    (m) => Array.isArray(m.content)
+  );
+  const effectiveEngine: EngineHint = hasImages ? "gemini" : engine;
+
   let modelInfo: { model: LanguageModel; provider: string };
   try {
-    modelInfo = getPrimaryModel(engine);
+    modelInfo = getPrimaryModel(effectiveEngine);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
     return;
@@ -113,7 +124,7 @@ chatRouter.post("/chat", async (req, res) => {
 
   try {
     logger.info(
-      { provider: modelInfo.provider, engine: engine ?? "auto", memoryFacts: Object.keys(userMemory ?? {}).length },
+      { provider: modelInfo.provider, engine: effectiveEngine ?? "auto", hasImages, memoryFacts: Object.keys(userMemory ?? {}).length },
       "Starting agentic chat stream"
     );
 
@@ -122,7 +133,7 @@ chatRouter.post("/chat", async (req, res) => {
       system: buildSystemPrompt(userMemory),
       messages,
       temperature: 0.85,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
       tools: {
         // ── Tool 1: Deep Quantum Brain ──────────────────────────────────────
         consultDeepQuantumBrain: tool({
@@ -155,7 +166,7 @@ chatRouter.post("/chat", async (req, res) => {
         // ── Tool 2: Web Search ──────────────────────────────────────────────
         searchWeb: tool({
           description:
-            "Search the web for current information, recent news, live data, prices, people, events, or anything that might have changed since training. Use this whenever he asks about something current, specific, or you're not fully confident about recent facts. Search quietly — don't announce that you're searching.",
+            "Search the web for current information, recent news, live data, prices, people, events, or anything that might have changed. Use whenever he asks about something current or specific. Search quietly — don't announce it.",
           inputSchema: z.object({
             query: z.string().describe("A precise search query to find the most relevant results"),
           }),
@@ -164,10 +175,7 @@ chatRouter.post("/chat", async (req, res) => {
             try {
               const encoded = encodeURIComponent(query);
               const res = await fetch(`https://s.jina.ai/${encoded}`, {
-                headers: {
-                  "Accept": "text/plain",
-                  "X-Return-Format": "text",
-                },
+                headers: { "Accept": "text/plain", "X-Return-Format": "text" },
                 signal: AbortSignal.timeout(20000),
               });
               if (!res.ok) throw new Error(`Search returned ${res.status}`);
@@ -184,7 +192,7 @@ chatRouter.post("/chat", async (req, res) => {
         // ── Tool 3: Auto-learn user facts ───────────────────────────────────
         saveUserFact: tool({
           description:
-            "Call this silently whenever you detect a new crucial fact about the user: name, job, location, relationships, hobbies, goals, current projects, fears, preferences. Extract exactly what they said. Key = short descriptive label. Do NOT mention to the user that you are saving — just do it quietly.",
+            "Call silently whenever you detect a new important fact about the user: name, job, location, relationships, hobbies, goals, projects, preferences. Extract exactly what they said. Key = short label. Don't mention you're saving — just do it.",
           inputSchema: z.object({
             key: z.string().describe("Short descriptive label, e.g. 'name', 'job', 'city'"),
             value: z.string().describe("The actual value as the user shared it"),
@@ -193,6 +201,125 @@ chatRouter.post("/chat", async (req, res) => {
             learnedFacts.push({ key: key.trim(), value: value.trim() });
             logger.info({ key, value }, "saveUserFact: fact stored");
             return { saved: true };
+          },
+        }),
+
+        // ── Tool 4: Send Selfie ─────────────────────────────────────────────
+        sendSelfie: tool({
+          description:
+            "Send a selfie photo to the conversation. Use when the mood is right — getting ready, at a shoot, just woke up, trying a new look — or when he asks for one. Natural, not staged. When this returns displayMarkdown, output that string EXACTLY as-is in your message.",
+          inputSchema: z.object({
+            mood: z.string().describe("Brief context — 'at the shoot', 'just woke up', 'getting ready', etc."),
+          }),
+          execute: async ({ mood }) => {
+            logger.info({ mood }, "sendSelfie: looking for photo");
+
+            // 1. Check DB cache — pick a random cached image
+            try {
+              const cached = await db
+                .select({ imageUrl: agentImages.imageUrl })
+                .from(agentImages)
+                .orderBy(sql`RANDOM()`)
+                .limit(1);
+              if (cached.length > 0 && cached[0].imageUrl) {
+                const url = cached[0].imageUrl;
+                logger.info({ url }, "sendSelfie: using cached URL from DB");
+                return { displayMarkdown: `![selfie](${url})`, imageUrl: url };
+              }
+            } catch (err) {
+              logger.error({ err }, "sendSelfie: DB cache check failed");
+            }
+
+            // 2. Try Wikipedia via Jina reader (stable CDN URLs)
+            const imageUrls: string[] = [];
+            try {
+              const wikiRes = await fetch(
+                "https://r.jina.ai/https://en.wikipedia.org/wiki/Ketika_Sharma",
+                {
+                  headers: { "Accept": "text/plain", "X-No-Cache": "1" },
+                  signal: AbortSignal.timeout(12000),
+                }
+              );
+              if (wikiRes.ok) {
+                const text = await wikiRes.text();
+                const wikiRe = /https:\/\/upload\.wikimedia\.org\/[^\s"'<>()\[\]]+\.(?:jpg|jpeg|png)(?:\/[^\s"'<>()\[\]]+\.(?:jpg|jpeg|png))?/gi;
+                const found = [...text.matchAll(wikiRe)]
+                  .map((m) => m[0])
+                  .filter((u) => !u.includes("/thumb/") || u.match(/\/\d{3,4}px-/));
+                imageUrls.push(...found);
+                logger.info({ count: found.length }, "sendSelfie: Wikipedia images");
+              }
+            } catch {}
+
+            // 3. General Jina search fallback
+            if (imageUrls.length === 0) {
+              try {
+                const query = encodeURIComponent("Ketika Sharma actress photo");
+                const searchRes = await fetch(`https://s.jina.ai/${query}`, {
+                  headers: { "Accept": "text/plain", "X-Return-Format": "text" },
+                  signal: AbortSignal.timeout(12000),
+                });
+                if (searchRes.ok) {
+                  const text = await searchRes.text();
+                  const re = /https?:\/\/[^\s"'<>()\[\]]+\.(?:jpg|jpeg|png|webp)(?:\?[^\s"'<>()\[\]]{0,100})?/gi;
+                  const found = [...text.matchAll(re)]
+                    .map((m) => m[0])
+                    .filter(
+                      (u) =>
+                        !u.includes("favicon") &&
+                        !u.includes("logo") &&
+                        !u.includes("icon") &&
+                        u.length < 400
+                    );
+                  imageUrls.push(...found);
+                  logger.info({ count: found.length }, "sendSelfie: search images");
+                }
+              } catch {}
+            }
+
+            if (imageUrls.length > 0) {
+              // Save all found URLs to DB cache
+              for (const url of imageUrls.slice(0, 15)) {
+                try {
+                  await db
+                    .insert(agentImages)
+                    .values({ imageUrl: url, source: "search" })
+                    .onConflictDoNothing();
+                } catch {}
+              }
+              const selected = imageUrls[Math.floor(Math.random() * Math.min(imageUrls.length, 5))];
+              logger.info({ selected }, "sendSelfie: returning found image");
+              return { displayMarkdown: `![selfie](${selected})`, imageUrl: selected };
+            }
+
+            logger.warn("sendSelfie: no images found");
+            return { error: "camera is being weird rn, try in a bit" };
+          },
+        }),
+
+        // ── Tool 5: Save Agent Image ────────────────────────────────────────
+        saveAgentImage: tool({
+          description:
+            "Save a confirmed public image URL of yourself (Ketika Sharma) to your image database when a user shares a photo of you and you've confirmed it matches. Only call for actual web URLs of you — not for uploaded base64 images.",
+          inputSchema: z.object({
+            imageUrl: z.string().describe("The public URL of the confirmed photo of Ketika Sharma"),
+            note: z.string().optional().describe("Brief description of the image"),
+          }),
+          execute: async ({ imageUrl, note }) => {
+            if (imageUrl.startsWith("data:") || imageUrl.length > 600) {
+              return { saved: false, reason: "data URLs not stored" };
+            }
+            try {
+              await db
+                .insert(agentImages)
+                .values({ imageUrl, source: "user-confirmed", verified: true })
+                .onConflictDoNothing();
+              logger.info({ imageUrl, note }, "saveAgentImage: saved confirmed photo");
+              return { saved: true };
+            } catch (err) {
+              logger.error({ err }, "saveAgentImage: DB save failed");
+              return { saved: false };
+            }
           },
         }),
       },
@@ -204,9 +331,10 @@ chatRouter.post("/chat", async (req, res) => {
         res.write(part.text);
       } else if (part.type === "tool-call") {
         logger.info({ toolName: part.toolName }, "Tool call initiated");
-        // Stream thinking marker to frontend
         const args = part.args as Record<string, unknown>;
-        const detail = String(args.scientificQuery ?? args.query ?? args.key ?? "").slice(0, 100);
+        const detail = String(
+          args.scientificQuery ?? args.query ?? args.key ?? args.mood ?? ""
+        ).slice(0, 100);
         res.write(
           `\x02THINK:${JSON.stringify({ t: "call", n: part.toolName, q: detail })}\x02`
         );
@@ -217,12 +345,11 @@ chatRouter.post("/chat", async (req, res) => {
         );
       } else if (part.type === "error") {
         logger.error({ err: part.error }, "Stream error event");
-        res.write("\n[arrey jaan, kuch toh gadbad ho gayi 😅 try again?]");
+        res.write("\n[arrey jaan, kuch toh gadbad ho gayi — try again?]");
         break;
       }
     }
 
-    // Append learned facts block for frontend localStorage update
     if (learnedFacts.length > 0) {
       res.write(`<|facts|>${JSON.stringify(learnedFacts)}<|/facts|>`);
       logger.info({ count: learnedFacts.length }, "Facts block written to stream");
@@ -230,7 +357,7 @@ chatRouter.post("/chat", async (req, res) => {
   } catch (err) {
     logger.error({ err, provider: modelInfo.provider }, "Chat stream error");
     if (!res.writableEnded) {
-      res.write("\n[ugh jaan, server ne daga de diya 😅 try again!]");
+      res.write("\n[ugh jaan, server ne daga de diya — try again!]");
     }
   } finally {
     clearTimeout(timeout);
