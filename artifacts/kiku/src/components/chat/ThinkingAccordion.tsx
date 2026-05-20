@@ -28,6 +28,7 @@ export function ThinkingAccordion({ steps, isStreaming }: ThinkingAccordionProps
       const t = setTimeout(() => setOpen(false), 2200);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [isStreaming, steps.length]);
 
   if (steps.length === 0) return null;

@@ -32,25 +32,47 @@ export function ChatInterface() {
   const showTypingIndicator =
     isLoading && (lastMsg?.role !== 'assistant' || lastMsg?.content === '');
 
-  // The last assistant message is the one currently streaming
   const streamingMsgId =
     isLoading && lastMsg?.role === 'assistant' ? lastMsg.id : null;
+
+  const hasBg = Boolean(config.bgImageUrl);
 
   return (
     <div
       className="chat-height flex flex-col relative overflow-hidden"
-      style={{ background: 'var(--bg-base)' }}
+      style={{ background: hasBg ? 'transparent' : 'var(--bg-base)' }}
     >
-      {/* Ambient background glow */}
+      {/* Custom background image layer */}
+      {hasBg && (
+        <>
+          <div
+            className="pointer-events-none fixed inset-0"
+            style={{
+              zIndex: -2,
+              backgroundImage: `url(${config.bgImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+            }}
+          />
+          <div
+            className="pointer-events-none fixed inset-0"
+            style={{ zIndex: -1, background: 'rgba(0,0,0,0.62)' }}
+          />
+        </>
+      )}
+
+      {/* Ambient glow (shown when no custom bg, or subtly on top of bg) */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
         aria-hidden="true"
         style={{
-          background: `
-            radial-gradient(ellipse 60% 40% at 20% 10%, var(--neon-teal-dim) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 35% at 80% 85%, var(--neon-blue-dim) 0%, transparent 55%),
-            radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,0,0,0) 0%, var(--bg-base) 100%)
-          `,
+          background: hasBg
+            ? `radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0,212,170,0.06) 0%, transparent 60%),
+               radial-gradient(ellipse 50% 35% at 80% 85%, rgba(59,139,235,0.06) 0%, transparent 55%)`
+            : `radial-gradient(ellipse 60% 40% at 20% 10%, var(--neon-teal-dim) 0%, transparent 60%),
+               radial-gradient(ellipse 50% 35% at 80% 85%, var(--neon-blue-dim) 0%, transparent 55%),
+               radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,0,0,0) 0%, var(--bg-base) 100%)`,
         }}
       />
 

@@ -1,7 +1,9 @@
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Brain, Cpu } from 'lucide-react';
+import { X, Zap, Brain, Cpu, Upload, Link2, Image as ImageIcon } from 'lucide-react';
 import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import { useUserConfig, AIEngine } from '@/contexts/UserConfigContext';
+import { compressImage } from '@/lib/imageUtils';
 import { MemoryCore } from './MemoryCore';
 
 interface SettingsDrawerProps {
@@ -10,45 +12,221 @@ interface SettingsDrawerProps {
 }
 
 const THEME_OPTIONS: { id: ThemeName; label: string; sub: string; preview: [string, string, string] }[] = [
-  {
-    id: 'obsidian',
-    label: 'Obsidian Terminal',
-    sub: 'Monochrome · Slate',
-    preview: ['#050507', '#111113', '#9090a8'],
-  },
-  {
-    id: 'cyberpunk',
-    label: 'Cyberpunk Tokyo',
-    sub: 'Purple · Neon Blue',
-    preview: ['#08000f', '#150030', '#00e5ff'],
-  },
-  {
-    id: 'custom',
-    label: 'Custom Accent',
-    sub: 'Pick your color',
-    preview: ['#070a10', '#121820', '#00d4aa'],
-  },
+  { id: 'obsidian', label: 'Obsidian Terminal', sub: 'Monochrome · Slate', preview: ['#050507', '#111113', '#9090a8'] },
+  { id: 'cyberpunk', label: 'Cyberpunk Tokyo', sub: 'Purple · Neon Blue', preview: ['#08000f', '#150030', '#00e5ff'] },
+  { id: 'custom', label: 'Custom Accent', sub: 'Pick your color', preview: ['#070a10', '#121820', '#00d4aa'] },
 ];
 
 const ENGINE_OPTIONS: { id: AIEngine; label: string; sub: string; icon: typeof Zap }[] = [
   { id: 'groq', label: 'Groq Fast Core', sub: 'llama-3.3-70b · ultra-low latency', icon: Zap },
-  { id: 'gemini', label: 'Gemini Quantum Core', sub: 'gemini-2.0-flash · deep reasoning', icon: Brain },
+  { id: 'gemini', label: 'Gemini Quantum Core', sub: 'gemini-2.5-flash · deep reasoning', icon: Brain },
 ];
 
 function ColorSwatch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <label className="relative flex-shrink-0 cursor-pointer" style={{ width: 28, height: 28 }}>
-      <span
-        className="block w-full h-full rounded-full border-2 transition-all"
-        style={{ background: value, borderColor: 'rgba(255,255,255,0.18)' }}
-      />
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-      />
+      <span className="block w-full h-full rounded-full border-2 transition-all" style={{ background: value, borderColor: 'rgba(255,255,255,0.18)' }} />
+      <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
     </label>
+  );
+}
+
+interface ImageUploaderProps {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+  isCircle?: boolean;
+  maxWidth: number;
+  maxHeight: number;
+  previewHeight?: number;
+}
+
+function ImageUploader({ label, value, onChange, isCircle, maxWidth, maxHeight, previewHeight = 72 }: ImageUploaderProps) {
+  const [urlMode, setUrlMode] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      const compressed = await compressImage(file, maxWidth, maxHeight, 0.82);
+      onChange(compressed);
+    } catch {}
+    setLoading(false);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  function handleUrlApply() {
+    const trimmed = urlInput.trim();
+    if (!trimmed) return;
+    onChange(trimmed);
+    setUrlMode(false);
+    setUrlInput('');
+  }
+
+  const previewStyle: React.CSSProperties = isCircle
+    ? { width: previewHeight, height: previewHeight, borderRadius: '50%', flexShrink: 0 }
+    : { width: '100%', height: previewHeight, borderRadius: 10 };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        {/* Preview */}
+        <div style={{ position: 'relative', ...previewStyle }}>
+          {value ? (
+            <>
+              <img
+                src={value}
+                alt={label}
+                style={{ ...previewStyle, objectFit: 'cover', border: '1.5px solid var(--glass-border)' }}
+              />
+              <button
+                onClick={() => onChange('')}
+                style={{
+                  position: 'absolute',
+                  top: -7,
+                  right: -7,
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: 'rgba(10,10,15,0.92)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.75)',
+                  zIndex: 2,
+                }}
+                aria-label="Remove"
+              >
+                <X size={9} />
+              </button>
+            </>
+          ) : (
+            <div
+              style={{
+                ...previewStyle,
+                border: '1.5px dashed rgba(255,255,255,0.12)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                background: 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <ImageIcon size={isCircle ? 18 : 20} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+              {!isCircle && (
+                <span className="text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>
+                  no image
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Buttons (shown to the right of circle preview, or below wide preview) */}
+        {isCircle && (
+          <div className="flex flex-col gap-1.5" style={{ paddingTop: 4 }}>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all"
+              style={{
+                background: 'var(--bg-base)',
+                border: '1px solid var(--glass-border)',
+                color: 'var(--text-secondary)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Upload size={10} />
+              {loading ? 'compressing…' : 'Upload photo'}
+            </button>
+            <button
+              onClick={() => setUrlMode((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all"
+              style={{
+                background: urlMode ? 'var(--neon-teal-dim)' : 'var(--bg-base)',
+                border: urlMode ? '1px solid var(--neon-teal-dim)' : '1px solid var(--glass-border)',
+                color: urlMode ? 'var(--neon-teal)' : 'var(--text-secondary)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Link2 size={10} />
+              Use URL
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Buttons below (for wide/banner/bg previews) */}
+      {!isCircle && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all"
+            style={{
+              background: 'var(--bg-base)',
+              border: '1px solid var(--glass-border)',
+              color: 'var(--text-secondary)',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            <Upload size={10} />
+            {loading ? 'compressing…' : 'Upload image'}
+          </button>
+          <button
+            onClick={() => setUrlMode((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all"
+            style={{
+              background: urlMode ? 'var(--neon-teal-dim)' : 'var(--bg-base)',
+              border: urlMode ? '1px solid var(--neon-teal-dim)' : '1px solid var(--glass-border)',
+              color: urlMode ? 'var(--neon-teal)' : 'var(--text-secondary)',
+            }}
+          >
+            <Link2 size={10} />
+            Use URL
+          </button>
+        </div>
+      )}
+
+      {/* URL input */}
+      {urlMode && (
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleUrlApply()}
+            placeholder="https://..."
+            className="flex-1 px-3 py-1.5 rounded-lg text-[11px] outline-none"
+            style={{
+              background: 'var(--bg-base)',
+              border: '1px solid var(--glass-border)',
+              color: 'var(--text-primary)',
+            }}
+            autoFocus
+          />
+          <button
+            onClick={handleUrlApply}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+            style={{ background: 'var(--neon-teal-dim)', border: '1px solid var(--neon-teal-dim)', color: 'var(--neon-teal)' }}
+          >
+            Apply
+          </button>
+        </div>
+      )}
+
+      <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+    </div>
   );
 }
 
@@ -88,37 +266,79 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
             {/* Header */}
             <div
               className="flex items-center justify-between px-5 py-4 flex-shrink-0 sticky top-0 z-10"
-              style={{
-                borderBottom: '1px solid var(--glass-border)',
-                background: 'var(--bg-surface)',
-              }}
+              style={{ borderBottom: '1px solid var(--glass-border)', background: 'var(--bg-surface)' }}
             >
               <div>
-                <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                  Settings
-                </h2>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Customize your Ishita experience
-                </p>
+                <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Settings</h2>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Customize your Ishita experience</p>
               </div>
               <button
                 onClick={onClose}
                 className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200"
                 style={{ color: 'var(--text-secondary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 <X size={15} />
               </button>
             </div>
 
             <div className="flex flex-col gap-7 px-5 py-5">
+
+              {/* ── Visuals ── */}
+              <section>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
+                  Visuals
+                </p>
+                <div className="flex flex-col gap-4 rounded-xl p-3.5" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)' }}>
+                  {/* Avatar */}
+                  <div>
+                    <p className="text-[11px] mb-2.5" style={{ color: 'var(--text-secondary)' }}>Avatar photo</p>
+                    <ImageUploader
+                      label="Avatar photo"
+                      value={config.avatarImageUrl}
+                      onChange={(url) => setConfig({ avatarImageUrl: url })}
+                      isCircle
+                      maxWidth={320}
+                      maxHeight={320}
+                      previewHeight={68}
+                    />
+                  </div>
+
+                  <div style={{ height: 1, background: 'var(--glass-border)' }} />
+
+                  {/* Banner */}
+                  <div>
+                    <p className="text-[11px] mb-2.5" style={{ color: 'var(--text-secondary)' }}>Profile banner</p>
+                    <ImageUploader
+                      label="Profile banner"
+                      value={config.bannerImageUrl}
+                      onChange={(url) => setConfig({ bannerImageUrl: url })}
+                      maxWidth={1200}
+                      maxHeight={400}
+                      previewHeight={72}
+                    />
+                  </div>
+
+                  <div style={{ height: 1, background: 'var(--glass-border)' }} />
+
+                  {/* Chat Background */}
+                  <div>
+                    <p className="text-[11px] mb-2.5" style={{ color: 'var(--text-secondary)' }}>Chat background</p>
+                    <ImageUploader
+                      label="Chat background"
+                      value={config.bgImageUrl}
+                      onChange={(url) => setConfig({ bgImageUrl: url })}
+                      maxWidth={1920}
+                      maxHeight={1080}
+                      previewHeight={90}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Divider ── */}
+              <div style={{ height: 1, background: 'var(--glass-border)' }} />
 
               {/* ── Profile ── */}
               <section>
@@ -128,59 +348,49 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
 
                 <div className="flex items-center gap-4 mb-4">
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0"
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0 overflow-hidden"
                     style={{
-                      background: `linear-gradient(135deg, ${config.avatarColorFrom} 0%, ${config.avatarColorTo} 100%)`,
+                      background: config.avatarImageUrl
+                        ? 'transparent'
+                        : `linear-gradient(135deg, ${config.avatarColorFrom} 0%, ${config.avatarColorTo} 100%)`,
                       border: '1.5px solid var(--neon-teal-dim)',
                       boxShadow: '0 0 20px var(--neon-teal-dim)',
                       color: 'var(--neon-teal)',
                     }}
                   >
-                    {config.avatarInitial || 'I'}
+                    {config.avatarImageUrl ? (
+                      <img src={config.avatarImageUrl} alt="avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      config.avatarInitial || 'I'
+                    )}
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[11px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                      Avatar letter
-                    </label>
+                    <label className="block text-[11px] mb-1.5" style={{ color: 'var(--text-secondary)' }}>Avatar letter</label>
                     <input
                       type="text"
                       maxLength={2}
                       value={config.avatarInitial}
                       onChange={(e) => setConfig({ avatarInitial: e.target.value.toUpperCase() || 'I' })}
                       className="w-20 px-3 py-1.5 rounded-lg text-sm font-semibold text-center outline-none transition-all"
-                      style={{
-                        background: 'var(--bg-elevated)',
-                        border: '1px solid var(--glass-border)',
-                        color: 'var(--text-primary)',
-                      }}
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
+                      placeholder="I"
+                      disabled={Boolean(config.avatarImageUrl)}
                     />
                   </div>
                 </div>
 
-                <div
-                  className="rounded-xl p-3.5 flex flex-col gap-3"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)' }}
-                >
+                <div className="rounded-xl p-3.5 flex flex-col gap-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)' }}>
                   <div className="flex items-center justify-between">
                     <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>Avatar gradient</span>
                     <div className="flex items-center gap-2">
-                      <ColorSwatch
-                        value={rgbaToHex(config.avatarColorFrom)}
-                        onChange={(hex) => setConfig({ avatarColorFrom: hexWithOpacity(hex, 0.3) })}
-                      />
+                      <ColorSwatch value={rgbaToHex(config.avatarColorFrom)} onChange={(hex) => setConfig({ avatarColorFrom: hexWithOpacity(hex, 0.3) })} />
                       <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>→</span>
-                      <ColorSwatch
-                        value={rgbaToHex(config.avatarColorTo)}
-                        onChange={(hex) => setConfig({ avatarColorTo: hexWithOpacity(hex, 0.3) })}
-                      />
+                      <ColorSwatch value={rgbaToHex(config.avatarColorTo)} onChange={(hex) => setConfig({ avatarColorTo: hexWithOpacity(hex, 0.3) })} />
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>Banner color</span>
-                    <ColorSwatch
-                      value={config.bannerColor}
-                      onChange={(hex) => setConfig({ bannerColor: hex })}
-                    />
+                    <ColorSwatch value={config.bannerColor} onChange={(hex) => setConfig({ bannerColor: hex })} />
                   </div>
                 </div>
               </section>
@@ -193,7 +403,6 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                 <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
                   Theme Engine
                 </p>
-
                 <div className="flex flex-col gap-2">
                   {THEME_OPTIONS.map((t) => {
                     const isActive = theme.name === t.id;
@@ -208,10 +417,7 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                           boxShadow: isActive ? '0 0 0 1px var(--neon-teal-dim)' : 'none',
                         }}
                       >
-                        <div
-                          className="w-9 h-9 rounded-lg flex-shrink-0 overflow-hidden"
-                          style={{ border: '1px solid rgba(255,255,255,0.08)' }}
-                        >
+                        <div className="w-9 h-9 rounded-lg flex-shrink-0 overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
                           <div className="w-full h-1/2" style={{ background: t.preview[0] }} />
                           <div className="flex h-1/2">
                             <div className="flex-1" style={{ background: t.preview[1] }} />
@@ -219,14 +425,10 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium truncate" style={{ color: isActive ? 'var(--neon-teal)' : 'var(--text-primary)' }}>
-                            {t.label}
-                          </p>
+                          <p className="text-[12px] font-medium truncate" style={{ color: isActive ? 'var(--neon-teal)' : 'var(--text-primary)' }}>{t.label}</p>
                           <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{t.sub}</p>
                         </div>
-                        {isActive && (
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--neon-teal)', boxShadow: '0 0 6px var(--neon-teal)' }} />
-                        )}
+                        {isActive && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--neon-teal)', boxShadow: '0 0 6px var(--neon-teal)' }} />}
                       </button>
                     );
                   })}
@@ -258,7 +460,6 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                 <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
                   AI Core
                 </p>
-
                 <div className="flex flex-col gap-2">
                   {ENGINE_OPTIONS.map((eng) => {
                     const isActive = config.engine === eng.id;
@@ -276,27 +477,19 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                       >
                         <div
                           className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{
-                            background: isActive ? 'var(--neon-teal-dim)' : 'rgba(255,255,255,0.04)',
-                            border: '1px solid var(--glass-border)',
-                          }}
+                          style={{ background: isActive ? 'var(--neon-teal-dim)' : 'rgba(255,255,255,0.04)', border: '1px solid var(--glass-border)' }}
                         >
                           <Icon size={14} style={{ color: isActive ? 'var(--neon-teal)' : 'var(--text-muted)' }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium truncate" style={{ color: isActive ? 'var(--neon-teal)' : 'var(--text-primary)' }}>
-                            {eng.label}
-                          </p>
+                          <p className="text-[12px] font-medium truncate" style={{ color: isActive ? 'var(--neon-teal)' : 'var(--text-primary)' }}>{eng.label}</p>
                           <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{eng.sub}</p>
                         </div>
-                        {isActive && (
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--neon-teal)', boxShadow: '0 0 6px var(--neon-teal)' }} />
-                        )}
+                        {isActive && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'var(--neon-teal)', boxShadow: '0 0 6px var(--neon-teal)' }} />}
                       </button>
                     );
                   })}
                 </div>
-
                 <div
                   className="mt-2 rounded-xl px-3.5 py-3 flex items-start gap-2.5"
                   style={{ background: 'var(--neon-teal-dim)', border: '1px solid var(--neon-teal-dim)' }}
@@ -314,7 +507,6 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
               {/* ── Memory Core ── */}
               <MemoryCore />
 
-              {/* Bottom padding */}
               <div style={{ height: 16 }} />
             </div>
           </motion.aside>
