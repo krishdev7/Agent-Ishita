@@ -104,7 +104,7 @@ function genId() {
 }
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
-export function useIshitaChat(
+export function useKetikaChat(
   engine: AIEngine = "groq",
   facts: UserFact[] = [],
   onFactLearned?: (key: string, value: string) => void,

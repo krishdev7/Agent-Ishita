@@ -22,8 +22,8 @@ profileRouter.put("/profile/:profileKey", async (req, res) => {
   try {
     const values = {
       profileKey,
-      displayName: b.displayName ?? "Ishita",
-      avatarInitial: b.avatarInitial ?? "I",
+      displayName: b.displayName ?? "Ketika",
+      avatarInitial: b.avatarInitial ?? "K",
       avatarColorFrom: b.avatarColorFrom ?? "rgba(0,212,170,0.25)",
       avatarColorTo: b.avatarColorTo ?? "rgba(59,139,235,0.25)",
       bannerColor: b.bannerColor ?? "#070a10",

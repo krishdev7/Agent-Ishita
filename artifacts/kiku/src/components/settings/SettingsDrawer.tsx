@@ -270,7 +270,7 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
             >
               <div>
                 <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Settings</h2>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Customize your Ishita experience</p>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Customize your Ketika experience</p>
               </div>
               <button
                 onClick={onClose}
@@ -361,7 +361,7 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                     {config.avatarImageUrl ? (
                       <img src={config.avatarImageUrl} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
-                      config.avatarInitial || 'I'
+                      config.avatarInitial || 'K'
                     )}
                   </div>
                   <div className="flex-1">
@@ -370,10 +370,10 @@ export function SettingsDrawer({ open, onClose }: SettingsDrawerProps) {
                       type="text"
                       maxLength={2}
                       value={config.avatarInitial}
-                      onChange={(e) => setConfig({ avatarInitial: e.target.value.toUpperCase() || 'I' })}
+                      onChange={(e) => setConfig({ avatarInitial: e.target.value.toUpperCase() || 'K' })}
                       className="w-20 px-3 py-1.5 rounded-lg text-sm font-semibold text-center outline-none transition-all"
                       style={{ background: 'var(--bg-elevated)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
-                      placeholder="I"
+                      placeholder="K"
                       disabled={Boolean(config.avatarImageUrl)}
                     />
                   </div>

@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { getOrCreateProfileKey } from '@/lib/profileKey';
 
-const STORAGE_KEY = 'ishita_memory_v1';
+const OLD_STORAGE_KEY = 'ishita_memory_v1';
+const STORAGE_KEY = 'ketika_memory_v1';
 
 export interface UserFact {
   id: string;
@@ -24,6 +25,12 @@ const MemoryContext = createContext<MemoryContextValue | null>(null);
 
 function loadFromStorage(): UserFact[] {
   try {
+    // Migrate from old key — preserves any locally-cached facts
+    const old = localStorage.getItem(OLD_STORAGE_KEY);
+    if (old) {
+      localStorage.setItem(STORAGE_KEY, old);
+      localStorage.removeItem(OLD_STORAGE_KEY);
+    }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     return JSON.parse(raw) as UserFact[];

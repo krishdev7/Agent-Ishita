@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { useIshitaChat } from '@/hooks/use-kiku-chat';
+import { useKetikaChat } from '@/hooks/use-kiku-chat';
 import { useUserConfig } from '@/contexts/UserConfigContext';
 import { useMemory } from '@/contexts/MemoryContext';
 import { ChatHeader } from './ChatHeader';
@@ -22,7 +22,7 @@ export function ChatInterface() {
     stop,
     pendingImage,
     setPendingImage,
-  } = useIshitaChat(
+  } = useKetikaChat(
     config.engine,
     facts,
     addOrUpdateFact,
