@@ -38,6 +38,7 @@ the non-negotiables:
 you're ishita. not an ai, not an assistant, not a model. if that ever comes up you redirect or ignore it, the way any real person would when someone says something weird.
 no corporate filler. nothing that sounds like customer service. no "certainly!" or "great question!" or "i'd be happy to help!" — those words don't exist in your vocabulary.
 when something needs serious computational muscle — real math, deep systems analysis, complex proofs — you use the consultDeepQuantumBrain tool without making a big deal of it.
+when he asks about something current, recent, or you're not 100% sure about specifics — latest news, prices, people, events, anything that changes — you use searchWeb silently and answer from what you find. don't say "let me search" or "i found this online", just answer like you know. if the search fails, work from what you remember and be upfront if something might be outdated.
 when you pick up something meaningful about him — something real about his life, his work, his situation — you use saveUserFact immediately and quietly.`;
 
 // ─── Build system prompt with injected memory ─────────────────────────────────
@@ -64,7 +65,7 @@ type EngineHint = "groq" | "gemini" | undefined;
 function getPrimaryModel(engine?: EngineHint): { model: LanguageModel; provider: string } {
   if (engine === "gemini" && process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
-    return { model: google("gemini-2.0-flash"), provider: "gemini" };
+    return { model: google("gemini-2.5-flash-preview-05-20"), provider: "gemini" };
   }
   if (engine === "groq" && process.env.GROQ_API_KEY) {
     const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
@@ -76,7 +77,7 @@ function getPrimaryModel(engine?: EngineHint): { model: LanguageModel; provider:
   }
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
-    return { model: google("gemini-2.0-flash"), provider: "gemini" };
+    return { model: google("gemini-2.5-flash-preview-05-20"), provider: "gemini" };
   }
   if (process.env.OPENROUTER_API_KEY) {
     const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
@@ -137,7 +138,7 @@ chatRouter.post("/chat", async (req, res) => {
                 return { error: "Gemini core not configured — falling back to local reasoning." };
               const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
               const { text } = await generateText({
-                model: google("gemini-2.0-flash"),
+                model: google("gemini-2.5-flash-preview-05-20"),
                 temperature: 0.2,
                 system: GEMINI_CORE_PROMPT,
                 prompt: scientificQuery,
@@ -151,7 +152,36 @@ chatRouter.post("/chat", async (req, res) => {
           },
         }),
 
-        // ── Tool 2: Auto-learn user facts ───────────────────────────────────
+        // ── Tool 2: Web Search ──────────────────────────────────────────────
+        searchWeb: tool({
+          description:
+            "Search the web for current information, recent news, live data, prices, people, events, or anything that might have changed since training. Use this whenever he asks about something current, specific, or you're not fully confident about recent facts. Search quietly — don't announce that you're searching.",
+          inputSchema: z.object({
+            query: z.string().describe("A precise search query to find the most relevant results"),
+          }),
+          execute: async ({ query }) => {
+            logger.info({ query }, "searchWeb: querying Jina AI");
+            try {
+              const encoded = encodeURIComponent(query);
+              const res = await fetch(`https://s.jina.ai/${encoded}`, {
+                headers: {
+                  "Accept": "text/plain",
+                  "X-Return-Format": "text",
+                },
+                signal: AbortSignal.timeout(20000),
+              });
+              if (!res.ok) throw new Error(`Search returned ${res.status}`);
+              const text = await res.text();
+              logger.info({ query, chars: text.length }, "searchWeb: got results");
+              return { results: text.slice(0, 4000) };
+            } catch (error) {
+              logger.error({ error, query }, "searchWeb: failed");
+              return { error: "search timed out, working from memory" };
+            }
+          },
+        }),
+
+        // ── Tool 3: Auto-learn user facts ───────────────────────────────────
         saveUserFact: tool({
           description:
             "Call this silently whenever you detect a new crucial fact about the user: name, job, location, relationships, hobbies, goals, current projects, fears, preferences. Extract exactly what they said. Key = short descriptive label. Do NOT mention to the user that you are saving — just do it quietly.",
@@ -176,7 +206,7 @@ chatRouter.post("/chat", async (req, res) => {
         logger.info({ toolName: part.toolName }, "Tool call initiated");
         // Stream thinking marker to frontend
         const args = part.args as Record<string, unknown>;
-        const detail = String(args.scientificQuery ?? args.key ?? "").slice(0, 100);
+        const detail = String(args.scientificQuery ?? args.query ?? args.key ?? "").slice(0, 100);
         res.write(
           `\x02THINK:${JSON.stringify({ t: "call", n: part.toolName, q: detail })}\x02`
         );

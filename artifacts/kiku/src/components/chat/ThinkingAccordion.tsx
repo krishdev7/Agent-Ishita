@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Cpu } from "lucide-react";
+import { ChevronDown, Cpu, Globe, Brain, BookMarked } from "lucide-react";
 import type { ThinkingStep } from "@/hooks/use-kiku-chat";
 
 interface ThinkingAccordionProps {
@@ -9,8 +9,15 @@ interface ThinkingAccordionProps {
 }
 
 const TOOL_LABELS: Record<string, string> = {
-  consultDeepQuantumBrain: "quantum brain",
+  consultDeepQuantumBrain: "deep brain",
+  searchWeb: "searching web",
   saveUserFact: "memory core",
+};
+
+const TOOL_ICONS: Record<string, typeof Cpu> = {
+  consultDeepQuantumBrain: Brain,
+  searchWeb: Globe,
+  saveUserFact: BookMarked,
 };
 
 export function ThinkingAccordion({ steps, isStreaming }: ThinkingAccordionProps) {
@@ -76,50 +83,48 @@ export function ThinkingAccordion({ steps, isStreaming }: ThinkingAccordionProps
               className="px-3 pb-2.5 pt-0.5 flex flex-col gap-1.5"
               style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
             >
-              {steps.map((step, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -4 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04, duration: 0.18 }}
-                  className="flex items-start gap-2"
-                >
-                  <span
-                    className="text-[10px] font-mono flex-shrink-0 mt-px"
-                    style={{
-                      color:
-                        step.type === "tool-call"
-                          ? "var(--neon-teal)"
-                          : "rgba(255,255,255,0.3)",
-                    }}
+              {steps.map((step, i) => {
+                const Icon = TOOL_ICONS[step.toolName] ?? Cpu;
+                const isCall = step.type === "tool-call";
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.18 }}
+                    className="flex items-center gap-2"
                   >
-                    {step.type === "tool-call" ? "→" : "←"}
-                  </span>
-                  <span
-                    className="text-[10px] font-mono leading-relaxed"
-                    style={{ color: "rgba(255,255,255,0.38)" }}
-                  >
-                    {step.type === "tool-call" ? (
-                      <>
-                        <span style={{ color: "rgba(255,255,255,0.55)" }}>
-                          {TOOL_LABELS[step.toolName] ?? step.toolName}
-                        </span>
-                        {step.detail && (
-                          <span style={{ color: "rgba(255,255,255,0.25)" }}>
-                            {" "}
-                            ({step.detail.slice(0, 60)}
-                            {step.detail.length > 60 ? "…" : ""})
+                    <Icon
+                      size={9}
+                      style={{
+                        color: isCall ? "var(--neon-teal)" : "rgba(255,255,255,0.25)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      className="text-[10px] font-mono leading-relaxed"
+                      style={{ color: "rgba(255,255,255,0.38)" }}
+                    >
+                      {isCall ? (
+                        <>
+                          <span style={{ color: "rgba(255,255,255,0.6)" }}>
+                            {TOOL_LABELS[step.toolName] ?? step.toolName}
                           </span>
-                        )}
-                      </>
-                    ) : (
-                      <span style={{ color: "rgba(255,255,255,0.28)" }}>
-                        {TOOL_LABELS[step.toolName] ?? step.toolName} responded
-                      </span>
-                    )}
-                  </span>
-                </motion.div>
-              ))}
+                          {step.detail && (
+                            <span style={{ color: "rgba(255,255,255,0.22)" }}>
+                              {" — "}{step.detail.slice(0, 70)}{step.detail.length > 70 ? "…" : ""}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span style={{ color: "rgba(255,255,255,0.25)" }}>
+                          ✓ {TOOL_LABELS[step.toolName] ?? step.toolName}
+                        </span>
+                      )}
+                    </span>
+                  </motion.div>
+                );
+              })}
               {isStreaming && (
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] font-mono" style={{ color: "var(--neon-teal)", opacity: 0.5 }}>
